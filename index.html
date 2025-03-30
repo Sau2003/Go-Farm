@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Commodity Price Predictor</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        
+        .container {
+            width: 60%;
+            padding: 20px;
+            text-align: center;
+            background: white;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #2E8B57;
+        }
+        
+        input {
+            width: 80%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        
+        button {
+            background-color: #2E8B57;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        button:hover {
+            background-color: #216c43;
+        }
+        
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: center;
+        }
+        
+        th {
+            background-color: #2E8B57;
+            color: white;
+        }
+        /* Chatbot Styling */
+        
+        #chat-container {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 300px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 10px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        #chat-header {
+            background: #2E8B57;
+            color: white;
+            padding: 10px;
+            font-weight: bold;
+            text-align: center;
+            border-radius: 10px 10px 0 0;
+        }
+        
+        #chat-body {
+            padding: 10px;
+        }
+        
+        #chat-messages {
+            height: 200px;
+            overflow-y: auto;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+        
+        #chat-input {
+            width: 70%;
+            padding: 5px;
+            border: 1px solid #ccc;
+        }
+        
+        button#chat-send {
+            width: 25%;
+            padding: 5px;
+            background: #2E8B57;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>Commodity Price Predictor</h1>
+        <label for="userInput">Enter Commodity Name:</label><br>
+        <input type="text" id="userInput" placeholder="e.g., Rice"><br>
+        <button onclick="sendData()">Predict Price</button>
+
+        <h2>Result (Price in Qi):</h2>
+        <p id="currentPrice"></p>
+
+        <!-- Table Wrapper for Responsiveness -->
+        <div class="table-container">
+            <table id="resultTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Today (Qi)</th>
+                        <th>In 3 days (Qi)</th>
+                        <th>Next week (Qi)</th>
+                        <th>Next 15 days (Qi)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td id="today"></td>
+                        <td id="in3days"></td>
+                        <td id="nextWeek"></td>
+                        <td id="next15days"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Chatbot Widget -->
+    <div id="chat-container">
+        <div id="chat-header">Farmer Assistant Chatbot</div>
+        <div id="chat-body">
+            <div id="chat-messages">
+                <strong>Chatbot:</strong> Select a question number:<br> 1️⃣ How to add a product list?<br> 2️⃣ How to check product quality?<br> 3️⃣ How to connect with the nearest retailer?<br> 4️⃣ How to see the forecasted price?<br>
+            </div>
+            <input type="text" id="chat-input" placeholder="Enter a number..." onkeypress="handleKeyPress(event)">
+            <button id="chat-send" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        async function sendData() {
+            let inputData = document.getElementById("userInput").value.trim().toLowerCase();
+
+            if (!inputData) {
+                alert("Please enter a commodity name!");
+                return;
+            }
+
+            try {
+                let response = await fetch("http://127.0.0.1:8000/predict", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        "commodity": inputData
+                    })
+                });
+
+                let result = await response.json();
+
+                if (result.error) {
+                    document.getElementById("currentPrice").innerText = "Error: " + result.error;
+                    document.getElementById("resultTable").style.display = "none";
+                } else {
+                    document.getElementById("currentPrice").innerText = `Current Price: ${parseFloat(result.current_price).toFixed(2)} Qi`;
+                    document.getElementById("today").innerText = parseFloat(result.forecast["Today"]).toFixed(2) + " Qi";
+                    document.getElementById("in3days").innerText = parseFloat(result.forecast["In 3 days"]).toFixed(2) + " Qi";
+                    document.getElementById("nextWeek").innerText = parseFloat(result.forecast["Next week"]).toFixed(2) + " Qi";
+                    document.getElementById("next15days").innerText = parseFloat(result.forecast["Next 15 days"]).toFixed(2) + " Qi";
+
+                    document.getElementById("resultTable").style.display = "table";
+                }
+            } catch (error) {
+                document.getElementById("currentPrice").innerText = "Error: Failed to fetch data.";
+                document.getElementById("resultTable").style.display = "none";
+            }
+        }
+
+        const chatbotResponses = {
+            "1": "Go to the 'Add Product' section in the app and fill in product details.",
+            "2": "We provide a quality check feature in the dashboard with real-time analytics.",
+            "3": "Use the 'Find Retailer' option to get the list of nearby retailers.",
+            "4": "The forecasted price is shown in the 'Predictions' section based on ML analysis."
+        };
+
+        function sendMessage() {
+            let userMessage = document.getElementById("chat-input").value.trim();
+            if (!chatbotResponses[userMessage]) return;
+
+            document.getElementById("chat-messages").innerHTML += `<div><strong>You:</strong> ${userMessage}</div>`;
+            setTimeout(() => {
+                document.getElementById("chat-messages").innerHTML += `<div><strong>Bot:</strong> ${chatbotResponses[userMessage]}</div>`;
+                document.getElementById("chat-messages").scrollTop = document.getElementById("chat-messages").scrollHeight;
+            }, 500);
+
+            document.getElementById("chat-input").value = "";
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") sendMessage();
+        }
+    </script>
+</body>
+
+</html>
