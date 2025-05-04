@@ -4,67 +4,48 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LinearRegression
 
-# Load dataset
-df = pd.read_csv("new.csv")  # Replace with actual dataset path
+df = pd.read_csv("new.csv")
+df.columns = df.columns.str.strip().str.replace(r"_x0020_", "_", regex=True)
 
-# Normalize commodity names in dataset
-df['Commodity'] = df['Commodity'].str.strip().str.title()  # Ensure consistency
+st.write("Data columns:", df.columns.tolist())
 
-# Encode Commodity column
+df['Commodity'] = df['Commodity'].str.strip().str.title()
 label_encoders = {"Commodity": LabelEncoder()}
 df['Commodity_Encoded'] = label_encoders["Commodity"].fit_transform(df['Commodity'])
 
-# Define feature columns (Ensure 'Day_Number' exists)
-feature_columns = [col for col in df.columns if col not in ['Modal_Price', 'Commodity']]
+feature_columns = [c for c in df.columns if c not in ['Modal_Price', 'Commodity']]
 X = df[feature_columns]
 y = df['Modal_Price']
 
-# Train the model
 lr_model = LinearRegression()
 lr_model.fit(X, y)
 
-# Streamlit UI
 st.title("Commodity Price Prediction")
-st.write("This app predicts the commodity price for a selected commodity and forecasts future prices.")
+st.write("Enter a commodity name to see its current price and forecasts.")
 
-# Input for commodity
-commodity_input = st.text_input("Enter Commodity Name:")
+commodity_input = st.text_input("Commodity Name:")
 
 if commodity_input:
-    # Normalize user input
-    commodity_input = commodity_input.strip().title()
-
-    # Check if commodity exists in dataset
-    if commodity_input not in df['Commodity'].values:
-        st.error(f"Commodity '{commodity_input}' not found. Check spelling!")
+    ci = commodity_input.strip().title()
+    if ci not in df['Commodity'].values:
+        st.error(f"Commodity '{ci}' not found. Please check spelling.")
     else:
-        # Transform commodity input
-        commodity_code = label_encoders['Commodity'].transform([commodity_input])[0]
-
-        # Filter dataset for selected commodity
-        commodity_data = df[df['Commodity_Encoded'] == commodity_code]
-
-        if commodity_data.empty:
-            st.error(f"No data available for commodity '{commodity_input}'.")
+        code = label_encoders['Commodity'].transform([ci])[0]
+        data_i = df[df['Commodity_Encoded'] == code]
+        if data_i.empty:
+            st.error(f"No data available for '{ci}'.")
         else:
-            # Get the latest entry
-            latest_entry = commodity_data.iloc[-1].copy()
-
-            # Forecast price intervals
+            latest = data_i.iloc[-1].copy()
             future_days = [0, 3, 7, 15]
-            forecast_labels = ["Today", "In 3 days", "Next week", "Next 15 days"]
-            forecasted_prices = {}
+            forecast_tags = ["Today", "In 3 days", "Next week", "Next 15 days"]
+            forecasts = {}
+            for days, tag in zip(future_days, forecast_tags):
+                latest['Day_Number'] += days
+                price = lr_model.predict([latest[feature_columns]])[0]
+                forecasts[tag] = round(price, 2)
 
-            for days, label in zip(future_days, forecast_labels):
-                latest_entry['Day_Number'] += days  # Adjust date feature
-
-                # Predict price for the adjusted feature
-                future_price = lr_model.predict([latest_entry[feature_columns]])[0]
-                forecasted_prices[label] = round(future_price, 2)
-
-            # Display results
-            st.write(f"**Current Price for {commodity_input}:** {forecasted_prices['Today']}")
-
-            st.write("**Price Forecasts:**")
-            for label, price in forecasted_prices.items():
-                st.write(f"{label}: {price}")
+            st.subheader(f"Results for {ci}")
+            st.write(f"**Current Price:** {forecasts['Today']}")
+            st.write("**Forecasts:**")
+            for tag, val in forecasts.items():
+                st.write(f"- {tag}: {val}")
